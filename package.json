@@ -1,0 +1,33 @@
+{
+  "name": "face-analysis-desktop",
+  "version": "1.0.0",
+  "description": "Desktop application for real-time face analysis",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "python main.py & electron .",
+    "build": "electron-builder",
+    "dev": "concurrently \"python main.py\" \"electron .\""
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "concurrently": "^8.2.2"
+  },
+  "build": {
+    "appId": "com.faceanalysis.app",
+    "productName": "Face Analysis",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "target": ["nsis", "portable"]
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Utility"
+    }
+  }
+} 

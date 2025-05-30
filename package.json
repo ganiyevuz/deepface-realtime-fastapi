@@ -1,33 +1,57 @@
 {
-  "name": "face-analysis-desktop",
+  "name": "face-analysis",
   "version": "1.0.0",
-  "description": "Desktop application for real-time face analysis",
+  "description": "Face Analysis Desktop Application",
   "main": "electron/main.js",
   "scripts": {
-    "start": "python main.py & electron .",
+    "start": "electron .",
+    "dev": "cross-env NODE_ENV=development electron .",
     "build": "electron-builder",
-    "dev": "concurrently \"python main.py\" \"electron .\""
-  },
-  "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "electron": "^28.1.0",
-    "electron-builder": "^24.9.1",
-    "concurrently": "^8.2.2"
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux"
   },
   "build": {
     "appId": "com.faceanalysis.app",
     "productName": "Face Analysis",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "static/**/*",
+      "templates/**/*",
+      "main.py",
+      "faces.db",
+      "requirements.txt"
+    ],
+    "extraResources": [
+      {
+        "from": ".venv",
+        "to": "python",
+        "filter": ["**/*"]
+      }
+    ],
     "mac": {
       "category": "public.app-category.utilities",
-      "target": ["dmg", "zip"]
+      "target": ["dmg", "zip"],
+      "icon": "static/icon.png"
     },
     "win": {
-      "target": ["nsis", "portable"]
+      "target": ["nsis", "portable"],
+      "icon": "static/icon.ico"
     },
     "linux": {
       "target": ["AppImage", "deb"],
-      "category": "Utility"
+      "category": "Utility",
+      "icon": "static/icon.png"
     }
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^29.1.0",
+    "electron-builder": "^24.13.3",
+    "cross-env": "^7.0.3"
   }
 } 

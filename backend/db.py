@@ -94,38 +94,91 @@ class FaceDB:
             return sanitize_numpy(best_match)  # Ensure all values are JSON serializable
         return None
 
-    def get_face_embedding(self, image_data: str) -> Optional[np.ndarray]:
+    def get_face_embedding(self, img: np.ndarray) -> Optional[np.ndarray]:
         """Extract face embedding from image data."""
         try:
-            result = DeepFace.represent(
-                img_path=image_data,
-                model_name='VGG-Face',
-                detector_backend='retinaface'
+            # First verify that a face is detected
+            face_objs = DeepFace.extract_faces(
+                img_path=img,
+                detector_backend='retinaface',
+                enforce_detection=True,
+                align=True
             )
-            if result:
+            
+            if not face_objs or len(face_objs) == 0:
+                print("No face detected in image")
+                return None
+            
+            # Get the aligned face image
+            aligned_face = face_objs[0]['face']
+            
+            # Get embedding for the aligned face
+            result = DeepFace.represent(
+                img_path=aligned_face,
+                model_name='VGG-Face',
+                detector_backend='retinaface',
+                enforce_detection=False  # We already detected the face
+            )
+            
+            if result and len(result) > 0:
                 return np.array(result[0]['embedding'])
+            else:
+                print("Failed to extract face embedding")
+                return None
+            
         except Exception as e:
-            print(f"Error extracting face embedding: {e}")
-        return None
+            print(f"Error extracting face embedding: {str(e)}")
+            return None
 
-    def register_face(self, name: str, image_data: str) -> Dict[str, Any]:
+    def register_face(self, name: str, img: np.ndarray) -> Dict[str, Any]:
         """Register a new face in the database."""
-        embedding = self.get_face_embedding(image_data)
-        if embedding is None:
+        try:
+            # First check if a face is detected
+            face_objs = DeepFace.extract_faces(
+                img_path=img,
+                detector_backend='retinaface',
+                enforce_detection=True,
+                align=True
+            )
+            
+            if not face_objs or len(face_objs) == 0:
+                return {
+                    "status": "error",
+                    "message": "Yuz aniqlanmadi. Iltimos, yuzingizni to'g'ri joylashtiring."
+                }
+            
+            # Get embedding
+            embedding = self.get_face_embedding(img)
+            if embedding is None:
+                return {
+                    "status": "error",
+                    "message": "Yuz ma'lumotlarini olishda xatolik yuz berdi. Qaytadan urinib ko'ring."
+                }
+            
+            # Check if face already exists
+            existing_match = self.find_match(embedding, threshold=0.8)
+            if existing_match:
+                return {
+                    "status": "error",
+                    "message": f"Bu yuz allaqachon ro'yxatdan o'tkazilgan: {existing_match['name']}"
+                }
+            
+            # Add new face
+            if self.add_face(name, embedding):
+                return {
+                    "status": "success",
+                    "message": f"{name} uchun yuz muvaffaqiyatli ro'yxatdan o'tkazildi"
+                }
             return {
                 "status": "error",
-                "message": "No face detected in the image"
+                "message": "Yuzni ro'yxatdan o'tkazishda xatolik yuz berdi"
             }
-        
-        if self.add_face(name, embedding):
+        except Exception as e:
+            print(f"Registration error: {str(e)}")
             return {
-                "status": "success",
-                "message": f"Face registered for {name}"
+                "status": "error",
+                "message": f"Xatolik yuz berdi: {str(e)}"
             }
-        return {
-            "status": "error",
-            "message": "Failed to register face"
-        }
 
 # Create a global instance
 face_db = FaceDB() 

@@ -9,20 +9,19 @@ let pythonProcess;
 function createWindow() {
     // Create the browser window
     mainWindow = new BrowserWindow({
-        width: 1400,
-        height: 900,
-        minWidth: 1200,
-        minHeight: 800,
+        width: 1280,
+        height: 800,
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: false
+            contextIsolation: false,
+            webSecurity: false // Required for local development
         },
-        icon: path.join(__dirname, '../static/icon.png'),
-        title: 'Face Analysis'
+        icon: path.join(__dirname, '../static/icon.png')
     });
 
     // Load the FastAPI app
-    mainWindow.loadURL('http://localhost:8000');
+    const startUrl = isDev ? 'http://localhost:8000' : 'http://localhost:8000';
+    mainWindow.loadURL(startUrl);
 
     // Open DevTools in development mode
     if (isDev) {
@@ -34,33 +33,50 @@ function createWindow() {
         mainWindow = null;
     });
 }
-
 function startPythonBackend() {
-    // Start the Python FastAPI server
-    pythonProcess = spawn('python', ['main.py'], {
-        stdio: 'inherit'
+    // Python binary from virtualenv (development)
+    const pythonPath = isDev 
+        ? path.join(__dirname, '../venv/bin/python') 
+        : path.join(process.resourcesPath, 'python');
+
+    // Path to main.py inside backend folder
+    const scriptPath = isDev 
+        ? path.join(__dirname, '../backend/main.py') 
+        : path.join(process.resourcesPath, 'backend', 'main.py');
+
+    console.log('Starting Python with:', pythonPath, scriptPath);
+
+    pythonProcess = spawn(pythonPath, [scriptPath], {
+        stdio: 'pipe'
     });
 
-    pythonProcess.on('error', (err) => {
-        console.error('Failed to start Python backend:', err);
-        app.quit();
+    pythonProcess.stdout.on('data', (data) => {
+        console.log(`[PYTHON STDOUT]: ${data.toString()}`);
     });
 
-    // Wait for the server to start
-    return new Promise((resolve) => {
-        setTimeout(resolve, 2000); // Give the server 2 seconds to start
+    pythonProcess.stderr.on('data', (data) => {
+        console.error(`[PYTHON STDERR]: ${data.toString()}`);
+    });
+
+    pythonProcess.on('close', (code) => {
+        console.log(`Python Backend exited with code ${code}`);
+        if (code !== 0 && mainWindow) {
+            mainWindow.webContents.send('backend-error', 'Backend process terminated unexpectedly');
+        }
     });
 }
 
+
 // App ready
-app.whenReady().then(async () => {
-    try {
-        await startPythonBackend();
-        createWindow();
-    } catch (error) {
-        console.error('Failed to start application:', error);
-        app.quit();
-    }
+app.whenReady().then(() => {
+    startPythonBackend();
+    createWindow();
+
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createWindow();
+        }
+    });
 });
 
 // Quit when all windows are closed
@@ -73,15 +89,17 @@ app.on('window-all-closed', () => {
     }
 });
 
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-    }
-});
-
-// Cleanup on quit
+// Handle app quit
 app.on('before-quit', () => {
     if (pythonProcess) {
         pythonProcess.kill();
     }
+});
+
+// Handle IPC messages
+ipcMain.on('restart-backend', () => {
+    if (pythonProcess) {
+        pythonProcess.kill();
+    }
+    startPythonBackend();
 }); 
